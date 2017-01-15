@@ -2,6 +2,7 @@ package uk.co.harrymartland.nonblockinghttp;
 
 import java.io.IOException;
 import java.nio.charset.Charset;
+import java.util.concurrent.Future;
 import org.apache.commons.io.IOUtils;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.methods.HttpGet;
@@ -17,14 +18,14 @@ import org.springframework.web.context.request.async.DeferredResult;
 
 @RestController
 @RequestMapping("/recursive")
-public class NonBlockingRecursive {
+public class Recursive {
 
-    private static final Logger LOG = LoggerFactory.getLogger(NonBlockingRecursive.class);
+    private static final Logger LOG = LoggerFactory.getLogger(Recursive.class);
 
     @Autowired
     private HttpAsyncClient httpAsyncClient;
 
-    @RequestMapping("{count}")
+    @RequestMapping("none/blocking/{count}")
     public DeferredResult<String> recurse(@PathVariable("count") final int count, final DeferredResult<String> result) {
         if (count == 0) {
             result.setResult("0");
@@ -34,8 +35,8 @@ public class NonBlockingRecursive {
         return result;
     }
 
-    private void sendNextRequest(@PathVariable("count") final int count, final DeferredResult<String> result) {
-        httpAsyncClient.execute(new HttpGet("http://localhost:8080/recursive/" + (count - 1)), new FutureCallback<HttpResponse>() {
+    private Future<HttpResponse> sendNextRequest(@PathVariable("count") final int count, final DeferredResult<String> result) {
+        return httpAsyncClient.execute(new HttpGet("http://localhost:8080/recursive/" + (count - 1)), new FutureCallback<HttpResponse>() {
             @Override
             public void completed(HttpResponse httpResponse) {
                 try {
