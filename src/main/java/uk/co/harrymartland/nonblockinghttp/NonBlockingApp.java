@@ -15,7 +15,7 @@ public class NonBlockingApp {
     }
 
     @Bean
-    public HttpAsyncClient httpAsyncClient(){
+    public HttpAsyncClient httpAsyncClient() {
         CloseableHttpAsyncClient client = HttpAsyncClientBuilder
                 .create()
                 .setMaxConnPerRoute(Integer.MAX_VALUE)

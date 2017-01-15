@@ -35,20 +35,20 @@ public class NonBlockingRecursive {
     }
 
     private void sendNextRequest(@PathVariable("count") final int count, final DeferredResult<String> result) {
-        httpAsyncClient.execute(new HttpGet("http://localhost:8080/recursive/"+(count-1)), new FutureCallback<HttpResponse>() {
+        httpAsyncClient.execute(new HttpGet("http://localhost:8080/recursive/" + (count - 1)), new FutureCallback<HttpResponse>() {
             @Override
             public void completed(HttpResponse httpResponse) {
                 try {
                     result.setResult(IOUtils.toString(httpResponse.getEntity().getContent(), Charset.defaultCharset()));
                 } catch (IOException e) {
-                    LOG.error("Error retrieving http entity",e);
-                    result.setResult("Exception, "+count+": "+e.getMessage());
+                    LOG.error("Error retrieving http entity", e);
+                    result.setResult("Exception, " + count + ": " + e.getMessage());
                 }
             }
 
             @Override
             public void failed(Exception e) {
-                result.setResult("failed " + count + ": " +e.getMessage());
+                result.setResult("failed " + count + ": " + e.getMessage());
             }
 
             @Override
