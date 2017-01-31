@@ -1,8 +1,10 @@
 package uk.co.harrymartland.nonblockinghttp;
 
+import static java.util.Objects.isNull;
 import java.io.IOException;
 import java.nio.charset.Charset;
-import java.util.concurrent.Future;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import org.apache.commons.io.IOUtils;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.methods.HttpGet;
@@ -25,38 +27,69 @@ public class Recursive {
     @Autowired
     private HttpAsyncClient httpAsyncClient;
 
-    @RequestMapping("none/blocking/{count}")
-    public DeferredResult<String> recurse(@PathVariable("count") final int count, final DeferredResult<String> result) {
+    @RequestMapping("/non/blocking/{count}")
+    public DeferredResult<String> nonBlocking(@PathVariable("count") final int count, final DeferredResult<String> result) {
+        LOG.info("Received recursive none blocking: {}", count);
         if (count == 0) {
             result.setResult("0");
         } else {
-            sendNextRequest(count, result);
+            String url = "http://localhost:8080/recursive/non/blocking/" + (count - 1);
+            sendNextRequest(url).handle((body, e) -> {
+                if (isNull(e)) {
+                    LOG.info("Finished recursive none blocking: {}", count);
+                    return result.setResult(body);
+                } else {
+                    LOG.error("Non blocking, exception thrown", e);
+                    return result.setResult("Failed " + url + ": " + e.getMessage());
+                }
+            });
         }
         return result;
     }
 
-    private Future<HttpResponse> sendNextRequest(@PathVariable("count") final int count, final DeferredResult<String> result) {
-        return httpAsyncClient.execute(new HttpGet("http://localhost:8080/recursive/" + (count - 1)), new FutureCallback<HttpResponse>() {
+    @RequestMapping("/blocking/{count}")
+    public String blocking(@PathVariable("count") final int count) {
+        LOG.info("received recursive blocking: {}", count);
+        if (count == 0) {
+            return "0";
+        } else {
+            try {
+                String response = sendNextRequest("http://localhost:8080/recursive/blocking/" + (count - 1)).get();
+                LOG.info("received recursive blocking: {}", count);
+                return response;
+            } catch (InterruptedException | ExecutionException e) {
+                LOG.error("Blocking, exception thrown", e);
+                return "Exception, " + count + ": " + e.getMessage();
+            }
+        }
+    }
+
+    private CompletableFuture<String> sendNextRequest(String url) {
+
+        CompletableFuture<String> future = new CompletableFuture<>();
+
+        httpAsyncClient.execute(new HttpGet(url), new FutureCallback<HttpResponse>() {
             @Override
             public void completed(HttpResponse httpResponse) {
                 try {
-                    result.setResult(IOUtils.toString(httpResponse.getEntity().getContent(), Charset.defaultCharset()));
+                    future.complete(IOUtils.toString(httpResponse.getEntity().getContent(), Charset.defaultCharset()));
                 } catch (IOException e) {
-                    LOG.error("Error retrieving http entity", e);
-                    result.setResult("Exception, " + count + ": " + e.getMessage());
+                    future.completeExceptionally(e);
                 }
             }
 
             @Override
             public void failed(Exception e) {
-                result.setResult("failed " + count + ": " + e.getMessage());
+                future.completeExceptionally(e);
             }
 
             @Override
             public void cancelled() {
-                result.setResult("cancelled: " + count);
+                future.completeExceptionally(new Exception("Cancellation"));
             }
         });
+
+        return future;
     }
 
 }
