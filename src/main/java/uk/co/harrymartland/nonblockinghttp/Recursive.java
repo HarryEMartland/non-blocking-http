@@ -15,6 +15,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.context.request.async.DeferredResult;
 
@@ -28,15 +29,27 @@ public class Recursive {
     private HttpAsyncClient httpAsyncClient;
 
     @RequestMapping("/non/blocking/{count}")
-    public DeferredResult<String> nonBlocking(@PathVariable("count") final int count, final DeferredResult<String> result) {
+    public DeferredResult<String> nonBlocking(
+            @PathVariable("count") final int count,
+            @RequestParam(value = "initial", defaultValue = "true") final boolean initial,
+            final DeferredResult<String> result) {
+        final long startTime;
+        if (initial) {
+            startTime = System.nanoTime();
+        } else {
+            startTime = 0;
+        }
         LOG.info("Received recursive none blocking: {}", count);
         if (count == 0) {
             result.setResult("0");
         } else {
-            String url = "http://localhost:8080/recursive/non/blocking/" + (count - 1);
+            String url = "http://localhost:8080/recursive/non/blocking/" + (count - 1) + "?initial=false";
             sendNextRequest(url).handle((body, e) -> {
                 if (isNull(e)) {
                     LOG.info("Finished recursive none blocking: {}", count);
+                    if (initial) {
+                        LOG.info("Took {} s", (System.nanoTime() - startTime) / 1000 / 1000 / 1000.);
+                    }
                     return result.setResult(body);
                 } else {
                     LOG.error("Non blocking, exception thrown", e);
@@ -48,14 +61,24 @@ public class Recursive {
     }
 
     @RequestMapping("/blocking/{count}")
-    public String blocking(@PathVariable("count") final int count) {
+    public String blocking(@PathVariable("count") final int count,
+                           @RequestParam(value = "initial", defaultValue = "true") final boolean initial) {
+        final long startTime;
+        if (initial) {
+            startTime = System.nanoTime();
+        } else {
+            startTime = 0;
+        }
         LOG.info("received recursive blocking: {}", count);
         if (count == 0) {
             return "0";
         } else {
             try {
-                String response = sendNextRequest("http://localhost:8080/recursive/blocking/" + (count - 1)).get();
+                String response = sendNextRequest("http://localhost:8080/recursive/blocking/" + (count - 1) + "?initial=false").get();
                 LOG.info("received recursive blocking: {}", count);
+                if (initial) {
+                    LOG.info("Took {} s", (System.nanoTime() - startTime) / 1000 / 1000 / 1000.);
+                }
                 return response;
             } catch (InterruptedException | ExecutionException e) {
                 LOG.error("Blocking, exception thrown", e);
